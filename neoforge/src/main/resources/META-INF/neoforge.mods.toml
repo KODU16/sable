@@ -12,6 +12,11 @@ credits = "${credits}"
 description = '''${description}'''
 logoFile = "icon.png"
 
+["lithium:options"]
+"mixin.entity.collisions.unpushable_cramming" = false
+"mixin.world.chunk_access" = false
+"mixin.world.chunk_ticking" = false
+
 [[dependencies.sable]]
 modId = "neoforge"
 type = "required"
@@ -34,19 +39,18 @@ ordering = "AFTER"
 side = "CLIENT"
 
 [[dependencies.sable]]
-modId = "scalablelux"
-type = "incompatible"
-
-["lithium:options"]
-"mixin.entity.collisions.unpushable_cramming" = false
-"mixin.world.chunk_access" = false
-"mixin.world.chunk_ticking" = false
-
-[[dependencies.sable]]
 modId = "sablecompanion"
 type = "incompatible"
 versionRange = "(${sable_companion_version},)"
 reason = "Sable is out of date"
+
+[[dependencies.sable]]
+modId = "scalablelux"
+type = "incompatible"
+
+[[dependencies.sable]]
+modId = "littletiles"
+type = "incompatible"
 
 [[mixins]]
 config = "sable.mixins.json"
