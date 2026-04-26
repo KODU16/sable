@@ -93,3 +93,4 @@ dependencies {
 - [Working with Entities](https://github.com/ryanhcode/sable/wiki/Working-With-Entities)
 - [Block Physics Properties](https://github.com/ryanhcode/sable/wiki/Block-Physics-Properties)
 - [Dimension Physics Data](https://github.com/ryanhcode/sable/wiki/Dimension-Physics-Data)
+- [Physical Interfaces and Usage](https://github.com/ryanhcode/sable/wiki/Physical-Interfaces)
