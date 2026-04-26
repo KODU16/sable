@@ -82,7 +82,29 @@ for (SubLevel sub : container.queryIntersecting(bounds)) {
 }
 ```
 
-### 1.4 读取速度信息
+
+### 1.4 判断某个 BlockPos 是否在子维度内，以及属于哪一个子维度
+
+最直接的 API 是 `Sable.HELPER.getContaining(level, pos)`（`pos` 可传 `BlockPos` / `Vec3i` / `Position` / `Vector3dc` 等）。
+
+- 返回 `null`：该位置不在任何子维度 plot 内。
+- 返回 `SubLevel`：该位置属于该子维度。
+
+```java
+// 功能：判断一个方块坐标是否在子维度内，并拿到所属子维度
+BlockPos pos = new BlockPos(x, y, z);
+SubLevel owner = Sable.HELPER.getContaining(level, pos);
+
+if (owner == null) {
+    // 功能：当前位置在世界主维度（不在任何子维度）
+} else {
+    // 功能：当前位置在 owner 这个子维度内，可继续读取 owner.getUniqueId()/getName()
+}
+```
+
+> 补充：如果你需要“一点可能命中多个旋转后包围盒”的近似查询，先用 `getAllIntersecting(...)` 做候选，再按业务精筛。
+
+### 1.5 读取速度信息
 
 #### A) 刚体速度（推荐）
 `RigidBodyHandle` 提供：
@@ -103,7 +125,7 @@ Vector3d w = handle.getAngularVelocity(new Vector3d());
 Vector3d vAir = SubLevelHelper.getVelocityRelativeToAir(level, worldPos, new Vector3d());
 ```
 
-### 1.5 质量与惯性信息
+### 1.6 质量与惯性信息
 
 `MassData` / `MassTracker` 核心可读项：
 - `getMass()` / `getInverseMass()`
@@ -244,3 +266,49 @@ public void sable$physicsTick(ServerSubLevel subLevel, RigidBodyHandle handle, d
 3. **按 physics tick 施力**：持续推力不要放在普通 game tick，优先放 `sable$physicsTick`。  
 4. **需要可视化就开分组记录**：`enableIndividualQueuedForcesTracking(true)` 后配合 `QueuedForceGroup` 便于调试。  
 5. **单位保持一致**：当前接口命名与注释存在“force/impulse”混用，工程实现要自定并严格一致。
+
+
+## 5. 进阶场景补充
+
+### 5.1 让玩家坐在“与方块绑定的乘坐实体（如坐垫）”上时，随子维度正常移动/旋转
+
+这个场景在 Sable 内部是按“**乘客跟随载具所在子维度**”处理的，关键点是：
+
+1. **让坐垫实体留在子维度里，不要被踢出**（通常给实体类型打 `#sable:retain_in_sub_level` 标签）。
+2. 玩家上座后，Sable 会把乘客的 tracking sub-level 继承为载具所在子维度，进而跟随子维度位姿变化。
+3. 对需要“无抖动显示”的同步点，可配合 `EntitySubLevelUtil.setOldPosNoMovement(entity)` 在客户端/同步包处理后刷新旧位置。
+
+```java
+// 功能：示例——生成可乘坐实体后，确保其留在子维度并让玩家乘坐
+Entity seat = ...; // 你的坐垫实体（建议在实体类型层面加入 retain_in_sub_level 标签）
+SubLevel seatSubLevel = Sable.HELPER.getContaining(level, seat);
+
+if (seatSubLevel != null) {
+    // 功能：玩家开始乘坐后，将自动跟随 seat 所在子维度的平移/旋转
+    player.startRiding(seat, true);
+
+    // 功能：可选，消除一帧“看起来移动了”的旧坐标误差
+    EntitySubLevelUtil.setOldPosNoMovement(player);
+}
+```
+
+> 若你在“读取 NBT 后重建骑乘关系”这类流程里手动摆放乘客位置，可参考 `EntityRidingSubLevelVehicleHelper.kickRidingEntity(...)` 的做法：按眼睛锚点把乘客位置从子维度局部转换到世界系，避免高度错位。
+
+### 5.2 方向转换：把子维度中方块朝向（东南西北上下）转成世界坐标系向量
+
+核心做法：
+
+1. 先把 `Direction` 变成局部单位向量（`direction.getNormal()`）；
+2. 用 `subLevel.logicalPose().transformNormal(localDir)` 转到世界系。
+
+```java
+// 功能：把子维度中的方块朝向(Direction)转换成世界系方向向量
+Direction localFacing = state.getValue(BlockStateProperties.FACING); // 例如 NORTH/UP 等
+Vector3d localDir = JOMLConversion.atLowerCornerOf(localFacing.getNormal());
+
+Vector3d worldDir = subLevel.logicalPose()
+    .transformNormal(localDir, new Vector3d()) // 功能：局部方向 -> 世界方向
+    .normalize();                               // 功能：归一化，便于作为射线/推力方向使用
+```
+
+如果你需要“世界向量 -> 子维度内朝向”，反向使用 `transformNormalInverse(...)`，再取 `Direction.getNearest(...)` 即可。
